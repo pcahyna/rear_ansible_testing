@@ -1,0 +1,27 @@
+- name: configure ReaR
+  import_tasks: rearconf.yml
+  vars:
+    rearconf_internal:
+      BACKUP_URL: "iso:///backup/"
+      BACKUP: NETFS
+      OUTPUT_URL: file://
+    
+
+# - name: modify conf file to configure backup url to iso
+#   lineinfile:
+#     path: /etc/rear/local.conf
+#     state: present
+#     line: BACKUP_URL=iso:///backup/
+#     regexp: BACKUP_URL=
+# - name: modify conf file again to configure internal backup
+#   lineinfile:
+#     path: /etc/rear/local.conf
+#     state: present
+#     line: BACKUP=NETFS
+#     regexp: BACKUP=
+# - name: modify conf file again to configure output to iso
+#   lineinfile:
+#     path: /etc/rear/local.conf
+#     state: present
+#     line: OUTPUT_URL=file://
+#     regexp: OUTPUT_URL=

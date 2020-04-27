@@ -1,0 +1,7 @@
+- name: add parameter to the ReaR config file
+  lineinfile:
+    path: /etc/rear/local.conf
+    state: present
+    line: "{{ item.key ~ '=' ~ item.value }}"
+    regexp: "{{ item.key ~ '=' }}"
+  loop: "{{ rearconf_internal|d({})|combine(rearconf|d({}))|dict2items }}"

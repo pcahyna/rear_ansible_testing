@@ -1,0 +1,36 @@
+- name: prepare package file for installation
+  block:
+    - name: create temporary dir
+      tempfile:
+        state: directory
+      register: download
+
+    - name: copy the package over
+      copy:
+        src: "{{ rearpkg }}"
+        dest: "{{ [download.path, rearpkg | basename ] | join('/') }}"
+      register: remotepkg
+
+    - name: remove old version in case new package has the same NVR but is not identical
+      yum:
+        name: rear
+        state: absent
+  when: rearpkg is defined
+
+- name: install rear
+  yum:
+    name: "{{ remotepkg.dest | default('rear') }}"
+    state: present
+    allow_downgrade: yes
+
+- name: install grub2-efi-x64-modules as workaround
+  yum:
+    name: grub2-efi-x64-modules
+    state: present
+  ignore_errors: true
+
+- name: use the registered var and the file module to remove the temporary dir
+  file:
+    path: "{{ download.path }}"
+    state: absent
+  when: download.path is defined

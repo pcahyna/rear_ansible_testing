@@ -1,0 +1,38 @@
+- hosts: libvirt
+  vars:
+    cdimage: ~/rear/rear-{{ libvirt_name }}.iso
+    newdisk: True
+  tasks:
+    - name: create backup iso
+      import_tasks: isobackup.yml
+      become: yes
+
+    - name: make the backup iso world-readable
+      file:
+        path: /var/lib/rear/output/rear-localhost.iso
+        state: file
+        mode: go+r
+      become: yes
+
+    - name: fetch backup iso
+      fetch:
+        src: /var/lib/rear/output/rear-localhost.iso
+        flat: True
+        dest: "{{ cdimage }}.tmp"
+# Fetch is very slow with become and setting become: no on a task does
+# not prevent it, it uses play ior connection level setting. Therefore
+# we need to not run the playbook with become and set become
+# individually on tasks that need it.
+#      become: no
+
+    - name: move backup iso to final destination
+      command: mv "{{ cdimage }}.tmp" "{{ cdimage }}"
+      delegate_to: localhost
+      become: no
+
+    - name: shutdown the domain and change boot settings
+      import_tasks: swapboot.yml
+      vars:
+        domain: "{{ libvirt_name }}"
+#      delegate_to: localhost
+      become: no
