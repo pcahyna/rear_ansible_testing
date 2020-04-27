@@ -1,0 +1,39 @@
+- name: set defaults
+  set_fact:
+    pool: myimages
+    restoreimage: "{{ domain }}-rearrestore.qcow2"
+    bootdisk: vda
+
+- name: determine disk info
+  command: virsh -c qemu:///system domblkinfo {{ domain }} {{ bootdisk }}
+  register: vdainfo
+
+- name: print variable
+  debug: var=vdainfo
+
+- name: find out disk size
+  set_fact:
+    disksize: "{{ vdainfo.stdout | regex_search('Capacity:.*') | regex_replace('Capacity:\\s*(\\d+).*', '\\1')  }}"
+
+- name: print size
+  debug: var=disksize
+
+- name: determine whether restore disk exists
+  command: virsh -c qemu:///system vol-info --pool {{ pool }} {{ restoreimage }}
+  register: image_result
+  failed_when: image_result.rc > 1
+  changed_when: false
+
+- name: create restore disk
+  command: virsh -c qemu:///system vol-create-as {{ pool }} {{ restoreimage }} {{ disksize }} --format qcow2
+  when: image_result.rc == 1
+
+- name: register restore disk path
+  command: virsh -c qemu:///system vol-path --pool {{ pool }} {{ restoreimage }}
+  register: image_path
+
+- name: detach the current disk
+  command: virsh -c qemu:///system detach-disk {{ domain }} {{ bootdisk }} --config
+
+- name: attach the restore disk
+  command: virsh -c qemu:///system attach-disk {{ domain }} {{ image_path.stdout }} {{ bootdisk }}  --config --subdriver qcow2 --sourcetype file --type disk

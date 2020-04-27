@@ -1,0 +1,42 @@
+- name: determine xml backup file
+  set_fact:
+    xmlbackup: "{{ domain }}-orig.xml"
+
+- name: XML backup file is
+  debug:
+    msg: "{{ xmlbackup }}"
+
+- name: shutdown the domain
+  virt:
+    name: "{{ libvirt_name  }}"
+    state: shutdown
+  delegate_to: localhost
+
+- name: test for vm status
+  virt:
+    name: "{{ libvirt_name }}"
+    command: status
+    uri: "qemu:///system"
+  register: result
+  until: result.status == 'shutdown'
+  delay: 1
+  retries: 60
+  delegate_to: localhost
+
+- name: save settings
+  shell: virsh -c qemu:///system dumpxml {{ domain|quote }} --inactive > {{ xmlbackup|quote }}
+  delegate_to: localhost
+
+- block:
+    - name: set bootable iso
+      import_tasks: bootiso.yml
+      delegate_to: localhost
+    - name: call setdisk
+      import_tasks: setdisk.yml
+      when: newdisk
+      delegate_to: localhost
+
+  rescue:
+    - name: restore settings after failure
+      command: virsh -c qemu:///system define {{ xmlbackup }}
+      delegate_to: localhost

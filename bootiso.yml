@@ -1,0 +1,53 @@
+- name: get XML from libvirt
+  virt: name="{{ domain }}" command=get_xml
+  register: domdef
+- name: change boot setting
+  xml:
+    xmlstring: "{{ domdef.get_xml }}"
+    xpath: /domain/os/boot
+    attribute: dev
+    value: cdrom
+    #        pretty_print: yes
+  register: bootxml
+  #    - name: print result
+  #      debug:
+  #        msg: "{{ outxml.xmlstring }}"
+- name: delete per-device boot elements
+  xml:
+    xmlstring: "{{ bootxml.xmlstring }}"
+    xpath: /domain/devices//boot[@order]
+    state: absent
+  register: outxml      
+- name: get temp file name
+  tempfile:
+    state: file
+    suffix: .xml
+  register: tmpname
+- name: save xml to file
+  copy:
+    content: "{{ outxml.xmlstring }}"
+    dest: "{{ tmpname.path }}"
+- name: print temp file name
+  debug: msg="{{ tmpname.path }}"
+- name: apply settings
+  #virt:
+  #  name: "{{ domain }}"
+  #  command: define
+  #  uri: "qemu:///session"
+  #  xml: "{{ outxml.xmlstring }}"
+  command: virsh -c qemu:///system define {{ tmpname.path }}
+
+  # this must be done after the change of boot setting, because
+  # saving & reloading the xml definition clobbers this setting
+  # (apparently it operates on the current configuration, not on the
+  # saved one)
+
+# the below leads to an error with a newer chipset type (Q35) and UEFI
+# not sure which of the two is the culprit, probably both
+# - name: add virtual cdrom
+#   command: virsh -c qemu:///system attach-disk {{ domain }} {{ cdimage }} hda --config --subdriver raw --sourcetype file --type cdrom
+# best solution could be to use SCSI, supported on both chipsets, but
+# requires adding a controller: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/virtualization_administration_guide/sect-managing_storage_controllers_in_a_guest
+
+- name: add virtual cdrom
+  command: virsh -c qemu:///system attach-disk {{ domain }} {{ cdimage }} sda --targetbus sata --config --subdriver raw --sourcetype file --type cdrom
