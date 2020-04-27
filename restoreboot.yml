@@ -1,0 +1,21 @@
+- hosts: localhost
+  vars:
+    domain: rhel7.3
+    cdimage: ~/rear/rear-rhel7.3.iso
+    xmlbackup: "{{ domain }}-orig.xml"
+  tasks:
+    - name: shutdown the domain
+      virt:
+        name: "{{ domain }}"
+        state: shutdown
+    - name: restore settings
+      #virt:
+      #  name: "{{ domain }}"
+      #  command: define
+      #  xml: "{{ lookup('file', xmlbackup ) }}"
+      #  uri: "qemu:///session"
+      command: virsh -c qemu:///system define {{ xmlbackup }}
+    # - name: start the domain
+    #   virt:
+    #     name: "{{ domain }}"
+    #     state: running
