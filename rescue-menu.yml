@@ -1,0 +1,10 @@
+- hosts: libvirt
+  tasks:
+    - name: create rescue iso
+      import_tasks: isorescue.yml
+      become: yes
+      vars:
+        rearconf_internal:
+          BACKUP_URL: "file:///mnt"
+          GRUB_RESCUE : "y"
+          OUTPUT_URL: file://
