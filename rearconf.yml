@@ -1,7 +1,12 @@
+- name: set the rearconf_final variable
+  set_fact:
+    rearconf_final: "{{ rearconf_internal|d({})|combine(rearconf|d({})) }}"
+
 - name: add parameter to the ReaR config file
   lineinfile:
     path: /etc/rear/local.conf
-    state: present
-    line: "{{ item.key ~ '=' ~ item.value }}"
+    state: "{{ 'present' if item.value is not none else 'absent' }}"
+    line: "{{ item.key ~ '=' ~ item.value if item.value is not none
+  else omit }}"
     regexp: "{{ item.key ~ '=' }}"
-  loop: "{{ rearconf_internal|d({})|combine(rearconf|d({}))|dict2items }}"
+  loop: "{{ rearconf_final | dict2items }}"

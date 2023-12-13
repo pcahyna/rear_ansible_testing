@@ -2,37 +2,86 @@
   vars:
     cdimage: ~/rear/rear-{{ libvirt_name }}.iso
     newdisk: True
+    # string that ReaR uses to distinguish between backups from
+    # different hosts, by default $(hostname)
+    rearprefix: localhost
+    # ISO image name as ReaR creates it
+    isoname: rear-{{ rearprefix }}.iso
+    # define  rearconf_final first before using output_url
+    output_url: "{{ rearconf_final.OUTPUT_URL |
+          d(rearconf_final.BACKUP_URL, true) }}"
+    fetchiso: "{{ output_url == 'null' or ( output_url |
+    urlsplit('scheme') ) == 'file' }}"
+
   tasks:
     - name: create backup iso
       import_tasks: isobackup.yml
       become: yes
 
-    - name: make the backup iso world-readable
-      file:
-        path: /var/lib/rear/output/rear-localhost.iso
-        state: file
-        mode: go+r
-      become: yes
+#    - include_tasks: controller_ssh_server.yml
+#      # FIXME assumes that rsync is always ssh
+#      when: ( 'ssh' in ( output_url | urlsplit('scheme') ) ) or
+#        ( ( output_url | urlsplit('scheme') ) in ('sftp', 'rsync') )
 
-    - name: fetch backup iso
-      fetch:
-        src: /var/lib/rear/output/rear-localhost.iso
-        flat: True
-        dest: "{{ cdimage }}.tmp"
-# Fetch is very slow with become and setting become: no on a task does
-# not prevent it, it uses play ior connection level setting. Therefore
-# we need to not run the playbook with become and set become
-# individually on tasks that need it.
-#      become: no
+    - block:
+        - name: retrieve the ISO from remote
+          block:
+            - name: make the backup iso world-readable
+              file:
+                path: /var/lib/rear/output/{{ isoname }}
+                state: file
+                mode: go+r
+              become: yes
 
-    - name: move backup iso to final destination
-      command: mv "{{ cdimage }}.tmp" "{{ cdimage }}"
-      delegate_to: localhost
-      become: no
+            - name: fetch backup iso
+              fetch:
+                src: /var/lib/rear/output/{{ isoname }}
+                flat: True
+                dest: "{{ cdimage }}.tmp"
+       # Fetch is very slow with become and setting become: no on a task does
+       # not prevent it, it uses play ior connection level setting. Therefore
+       # we need to not run the playbook with become and set become
+       # individually on tasks that need it.
+       #      become: no
 
-    - name: shutdown the domain and change boot settings
-      import_tasks: swapboot.yml
-      vars:
-        domain: "{{ libvirt_name }}"
-#      delegate_to: localhost
-      become: no
+            - name: move backup iso to final destination
+              command: mv "{{ cdimage }}.tmp" "{{ cdimage }}"
+              delegate_to: localhost
+              become: no
+
+          when: fetchiso
+
+        - name: debug rearconf_final
+          debug:
+            var: rearconf_final
+
+        - name: debug output_url
+          debug:
+            var: output_url
+
+        - name: move backup iso to final destination
+          # for rsync: mv {{ (output_url | urlsplit('path')) ~ '/' ~ rearprefix ~ '/' ~ isoname }}
+          command: mv {{ (output_url | urlsplit('path')) ~ '/' ~ isoname }} {{ cdimage }}
+          delegate_to: localhost
+          become: no
+          when: not fetchiso
+
+        - name: copy log
+          fetch:
+            src: /var/log/rear/rear-{{ rearprefix }}.log
+            flat: True
+            dest: "{{ playbook_dir }}/logs/{{ logprefix | d('') }}/{{
+              rearpkg | d('systempkg') | basename }}/{{
+              inventory_hostname }}/rear-{{ rearprefix }}.log.{{
+              '%Y-%m-%d@%H:%M:%S' | strftime }}"
+
+        - name: shutdown the domain and change boot settings
+          import_tasks: swapboot.yml
+          vars:
+            domain: "{{ libvirt_name }}"
+    #      delegate_to: localhost
+          become: no
+
+#        cdimage: "{{ isopath if fetchiso else (output_url |
+#        urlsplit('path')) ~ {{ isoname }} }}"
+
