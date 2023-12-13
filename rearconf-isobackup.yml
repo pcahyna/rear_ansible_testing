@@ -4,7 +4,7 @@
     rearconf_internal:
       BACKUP_URL: "iso:///backup/"
       BACKUP: NETFS
-      OUTPUT_URL: file://
+      OUTPUT_URL: 'null'
     
 
 # - name: modify conf file to configure backup url to iso
