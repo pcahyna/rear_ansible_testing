@@ -11,22 +11,28 @@
         dest: "{{ [download.path, rearpkg | basename ] | join('/') }}"
       register: remotepkg
 
-    - name: remove old version in case new package has the same NVR but is not identical
-      yum:
-        name: rear
-        state: absent
   when: rearpkg is defined
+
+# needs to be done even if rearpkg is not defined, so that we replace
+# the installed version (if different from the system version) by the
+# system version
+- name: remove old version in case new package has the same NVR but is not identical
+  yum:
+    name: rear
+    state: absent
 
 - name: install rear
   yum:
     name: "{{ remotepkg.dest | default('rear') }}"
     state: present
     allow_downgrade: yes
+    disable_gpg_check: yes
 
 - name: install grub2-efi-x64-modules as workaround
   yum:
     name: grub2-efi-x64-modules
     state: present
+    disable_gpg_check: yes
   ignore_errors: true
 
 - name: use the registered var and the file module to remove the temporary dir
